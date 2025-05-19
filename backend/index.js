@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const userRoutes = require('./routes/userRoutes');
 
 // Load environment variables from .env file
 dotenv.config({ path: './.env' });
@@ -34,9 +33,6 @@ connectDB();
 app.get('/', (req, res) => {
   res.send('SkillSwap Backend is running!');
 });
-
-// Use user routes
-app.use('/api/users', userRoutes);
 
 // Start the server
 app.listen(PORT, () => {
