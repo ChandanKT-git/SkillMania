@@ -1,164 +1,130 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const auth = require('../middleware/authMiddleware');
-
-
-// Make sure to configure dotenv in your main server file (e.g., index.js)
-// and ensure process.env.JWT_SECRET is available.
-const jwtSecret = process.env.JWT_SECRET;
 
 // @route   GET /api/users
 // @desc    Get all users
-// @access  Public (for now, can be restricted later)
-router.get('/', async (req, res) => {
+// @access  Private
+router.get('/', auth, async (req, res) => {
   try {
-    const users = await User.find().select('-password'); // Exclude password
+    const users = await User.find().select('-password');
     res.status(200).json(users);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ msg: 'Server Error' });
   }
 });
 
 // @route   GET /api/users/:id
 // @desc    Get user by ID
-// @access  Public (for now, can be restricted later)
+// @access  Private
 router.get('/:id', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password'); // Find user by ID and exclude password
+    const user = await User.findById(req.params.id).select('-password');
     if (!user) {
       return res.status(404).json({ msg: 'User not found' });
+    }
+
+    // Check if user is authorized to view this profile
+    if (user._id.toString() !== req.user.id) {
+      return res.status(403).json({ msg: 'User not authorized' });
     }
     res.status(200).json(user);
   } catch (err) {
     console.error(err.message);
-    if (err.kind === 'ObjectId') { // Handle invalid ObjectId format
+    if (err.kind === 'ObjectId') {
       return res.status(404).json({ msg: 'User not found' });
     }
-    res.status(500).send('Server Error');
+    res.status(500).json({ msg: 'Server Error' });
   }
 });
 
-
 // @route   PUT /api/users/:id
 // @desc    Update user by ID
-// @access  Public (can be restricted later)
+// @access  Private
 router.put('/:id', auth, async (req, res) => {
-  const { username, email, password } = req.body;
+  const { username, email } = req.body;
+
+  // Basic validation
+  if (!username && !email) {
+    return res.status(400).json({ msg: 'Please provide username or email to update' });
+  }
 
   const userFields = {};
   if (username) userFields.username = username;
   if (email) userFields.email = email;
-  // Note: Password update logic would typically be handled separately
-  // or involve verifying the old password. For simplicity, we're not
-  // handling password updates in this basic PUT endpoint. If password is included in req.body, it will be ignored for now.
 
   try {
     let user = await User.findById(req.params.id);
-
     if (!user) {
       return res.status(404).json({ msg: 'User not found' });
+    }
+
+    // Check if user is authorized to update this profile
+    if (user._id.toString() !== req.user.id) {
+      return res.status(403).json({ msg: 'User not authorized' });
+    }
+
+    // Check for duplicate email
+    if (email && email !== user.email) {
+      const emailExists = await User.findOne({ email });
+      if (emailExists) {
+        return res.status(400).json({ msg: 'Email already in use' });
+      }
+    }
+
+    // Check for duplicate username
+    if (username && username !== user.username) {
+      const usernameExists = await User.findOne({ username });
+      if (usernameExists) {
+        return res.status(400).json({ msg: 'Username already in use' });
+      }
     }
 
     user = await User.findByIdAndUpdate(
       req.params.id,
       { $set: userFields },
       { new: true }
-    ).select('-password'); // Exclude password
-
-// @route   GET /api/users/:id
-// @desc    Get user by ID (Duplicate - removed later)
-// @access  Public
-router.post('/register', async (req, res) => {
-  const { username, email, password } = req.body;
-
-  try {
-    // Check if user already exists
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ msg: 'User already exists' });
-    }
-
-    // Create new user instance
-    user = new User({
-      username,
-      email,
-      password, // This will be hashed below
-    });
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(password, salt);
-
-    // Save user to database
-    await user.save();
-
-    res.status(201).json({ msg: 'User registered successfully' });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
-});
-
-// @route   POST /api/users/login
-// @desc    Authenticate user & get token
-// @access  Public
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-
-  try {
-    // Find user by email
-    let user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ msg: 'Invalid Credentials' });
-    }
-
-    // Compare passwords
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ msg: 'Invalid Credentials' });
-    }
-
-    // Generate JWT token
-    const payload = { user: { id: user.id } };
-    jwt.sign(payload, jwtSecret, { expiresIn: '1h' }, (err, token) => {
-      if (err) throw err;
-      res.json({ token });
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
-});
+    ).select('-password');
 
     res.status(200).json(user);
   } catch (err) {
     console.error(err.message);
-    res.status(500).send('Server Error');
+    if (err.kind === 'ObjectId') {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+    res.status(500).json({ msg: 'Server Error' });
   }
 });
 
 // @route   DELETE /api/users/:id
 // @desc    Delete user by ID
-// @access  Public (can be restricted later)
+// @access  Private
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const user = await User.findByIdAndRemove(req.params.id);
-
+    const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ msg: 'User not found' });
     }
 
+    // Check if user is authorized to delete this profile
+    if (user._id.toString() !== req.user.id) {
+      return res.status(403).json({ msg: 'User not authorized' });
+    }
+
+    await User.findByIdAndDelete(req.params.id);
     res.status(200).json({ msg: 'User removed' });
   } catch (err) {
     console.error(err.message);
-    if (err.kind === 'ObjectId') { // Handle invalid ObjectId format
+    if (err.kind === 'ObjectId') {
       return res.status(404).json({ msg: 'User not found' });
     }
-    res.status(500).send('Server Error');
+    res.status(500).json({ msg: 'Server Error' });
   }
 });
+
+// Mount auth routes
+router.use('/auth', require('./authRoutes'));
+
 module.exports = router;
