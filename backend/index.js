@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 
-// Load environment variables from .env file
+// Load environment variables (optional, as dev.nix sets env)
 dotenv.config({ path: './.env' });
 
 const app = express();
@@ -11,25 +11,33 @@ const PORT = process.env.PORT || 5000;
 // Middleware for parsing JSON
 app.use(express.json());
 
-// Debug: Log MONGO_URI to verify it's loaded
+// Import user routes
+const userRoutes = require('./routes/userRoutes');
+
+// Mount user routes
+app.use('/api/users', userRoutes);
+
+// Debug: Log environment variables
 console.log('MONGO_URI:', process.env.MONGO_URI);
+console.log('PORT:', process.env.PORT);
+console.log('JWT_SECRET:', process.env.JWT_SECRET ? '***hidden***' : 'undefined');
 
 // Connect to MongoDB
 const connectDB = async () => {
   try {
     if (!process.env.MONGO_URI) {
-      throw new Error('MONGO_URI is not defined in .env file');
+      throw new Error('MONGO_URI is not defined');
     }
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(process.env.MONGO_URI, {});
     console.log('MongoDB connected successfully');
   } catch (error) {
     console.error('MongoDB connection error:', error.message);
-    process.exit(1); // Exit process if connection fails
+    process.exit(1);
   }
 };
 connectDB();
 
-// Basic route
+// Basic route 
 app.get('/', (req, res) => {
   res.send('SkillSwap Backend is running!');
 });
@@ -39,7 +47,7 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
-// Handle Mongoose connection errors after initial connection
+// Handle Mongoose connection errors
 mongoose.connection.on('error', err => {
   console.error('Mongoose connection error:', err);
 });
