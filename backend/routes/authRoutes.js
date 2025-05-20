@@ -12,6 +12,54 @@ const googleClientId = process.env.GOOGLE_CLIENT_ID; // Make sure this is also c
 
 const client = new OAuth2Client(googleClientId);
 
+// @desc    Register user
+// @access  Public
+router.post('/register', async (req, res) => {
+  const { username, email, password } = req.body;
+
+  // Basic validation
+  if (!username || !email || !password) {
+    return res.status(400).json({ msg: 'Please enter all fields' });
+  }
+
+  try {
+    // Check for existing user
+    let user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({ msg: 'User already exists' });
+    }
+
+    // Create new user instance
+    user = new User({
+      username,
+      email,
+      password,
+    });
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+
+    // Save user to database
+    await user.save();
+
+    // Generate JWT
+    const payload = {
+      user: {
+        id: user.id,
+      },
+    };
+
+    jwt.sign(payload, jwtSecret, { expiresIn: '1h' }, (err, token) => {
+      if (err) throw err;
+      res.status(201).json({ token }); // Use 201 for created resource
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
 // Define your authentication routes here
 
 // @route   POST /api/auth/google

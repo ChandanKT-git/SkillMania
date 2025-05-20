@@ -11,11 +11,20 @@ const PORT = process.env.PORT || 5000;
 // Middleware for parsing JSON
 app.use(express.json());
 
+// Middleware for parsing JSON
+app.use(express.json());
+
 // Import user routes
 const userRoutes = require('./routes/userRoutes');
 
 // Mount user routes
 app.use('/api/users', userRoutes);
+
+// Import auth routes
+const authRoutes = require('./routes/authRoutes');
+
+// Mount auth routes
+app.use('/api/auth', authRoutes);
 
 // Debug: Log environment variables
 console.log('MONGO_URI:', process.env.MONGO_URI);
