@@ -13,6 +13,7 @@ const googleClientId = process.env.GOOGLE_CLIENT_ID; // Make sure this is also c
 const client = new OAuth2Client(googleClientId);
 
 // @desc    Register user
+// @route   POST /api/auth/register
 // @access  Public
 router.post('/register', async (req, res) => {
   const { username, email, password } = req.body;
@@ -54,6 +55,52 @@ router.post('/register', async (req, res) => {
       if (err) throw err;
       res.status(201).json({ token }); // Use 201 for created resource
     });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// @route   POST /api/auth/login
+// @desc    Authenticate user & get token (login)
+// @access  Public
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    // Basic validation
+    if (!email || !password) {
+      return res.status(400).json({ msg: 'Please enter all fields' });
+    }
+
+    // Check for user
+    let user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).json({ msg: 'Invalid credentials' }); // Use generic message for security
+    }
+
+    // Compare password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ msg: 'Invalid credentials' }); // Use generic message for security
+    }
+
+    // Generate JWT
+    const payload = {
+      user: {
+        id: user.id,
+      },
+    };
+
+    jwt.sign(
+      payload,
+      jwtSecret,
+      { expiresIn: '1h' }, // Token expires in 1 hour
+      (err, token) => {
+        if (err) throw err;
+        res.json({ token }); // Return token
+      }
+    );
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');

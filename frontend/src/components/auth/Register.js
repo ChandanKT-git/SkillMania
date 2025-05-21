@@ -34,11 +34,12 @@ const Register = () => {
 
     try {
       // Make the API call
-      const res = await axios.post('/api/users/register', { username, email, password });
+      const res = await axios.post('/api/auth/register', { username, email, password });
       console.log(res.data); // Log success response
       setMessage('Registration successful!'); // Set success message
       setFormData({ username: '', email: '', password: '', password2: '' }); // Clear form data
-      navigate('/login'); // Redirect to login page
+      localStorage.setItem('token', res.data.token); // Store the JWT
+      navigate('/login'); // Redirect to login page after storing token
     } catch (err) {
       console.error(err.response.data); // Log error response
       // Set error message based on backend response or a generic one
@@ -46,7 +47,7 @@ const Register = () => {
     }
   };
 
-  return (
+ return (
     <div>
       <h2>Register</h2>
       {message && <p style={{ color: message.includes('successful') ? 'green' : 'red' }}>{message}</p>} {/* Display message */}
